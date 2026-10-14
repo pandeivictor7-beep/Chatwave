@@ -1,0 +1,341 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#10131b">
+<title>ChatWave</title>
+<style>
+:root {
+  --bg:#10131b; --panel:#191e29; --card:#202735;
+  --accent:#7c6cff; --text:#f5f6ff; --muted:#9ba5b7;
+}
+* {box-sizing:border-box}
+body {
+  margin:0;background:var(--bg);color:var(--text);
+  font-family:Arial,sans-serif;min-height:100vh;
+}
+button,input {font:inherit}
+button {cursor:pointer}
+.app {max-width:1050px;margin:auto;min-height:100vh;display:flex;flex-direction:column}
+header {
+  padding:18px;display:flex;align-items:center;justify-content:space-between;
+  border-bottom:1px solid #303746;
+}
+.brand {font-size:25px;font-weight:bold}
+.brand span {color:var(--accent)}
+.small {color:var(--muted);font-size:12px;margin-top:5px}
+main {display:grid;grid-template-columns:300px 1fr;flex:1;min-height:0}
+aside {padding:16px;border-right:1px solid #303746}
+h3 {margin-top:4px}
+input {
+  width:100%;padding:13px;border:1px solid #343d4d;
+  background:var(--card);color:white;border-radius:12px;outline:none;
+}
+button.primary {
+  border:0;background:var(--accent);color:white;padding:12px 16px;
+  border-radius:12px;font-weight:bold;
+}
+button.secondary {
+  background:var(--card);border:1px solid #343d4d;
+  color:white;padding:10px 13px;border-radius:10px;
+}
+#people {margin-top:16px}
+.person {
+  padding:13px;border-radius:12px;cursor:pointer;
+  background:transparent;margin-bottom:5px;
+}
+.person.active,.person:hover {background:var(--card)}
+.avatar {
+  width:43px;height:43px;border-radius:50%;background:#38305f;
+  display:grid;place-items:center;font-weight:bold;flex-shrink:0;
+}
+.person {display:flex;align-items:center;gap:12px}
+.person small {display:block;color:var(--muted);margin-top:5px}
+.chat {display:flex;flex-direction:column;min-height:70vh}
+.chathead {padding:17px;border-bottom:1px solid #303746;display:flex;align-items:center;gap:12px}
+#messages {padding:18px;display:flex;flex-direction:column;gap:12px;flex:1;overflow-y:auto}
+.bubble {
+  padding:11px 14px;background:var(--card);border-radius:15px;
+  max-width:85%;align-self:flex-start;overflow-wrap:anywhere;
+}
+.bubble.mine {align-self:flex-end;background:#5144bd}
+.bubble img {max-width:100%;max-height:250px;display:block;border-radius:10px}
+.time {font-size:10px;color:#c0c3d2;margin-top:6px}
+.composer {padding:13px;display:flex;align-items:center;gap:9px;border-top:1px solid #303746}
+.composer input {flex:1;min-width:0}
+#status {padding:8px 16px;color:var(--muted);font-size:12px}
+#auth {max-width:410px;margin:50px auto;padding:25px;background:var(--panel);border-radius:20px}
+#auth input {margin:7px 0}
+#auth button {width:100%;margin-top:10px}
+.hidden {display:none!important}
+.empty {margin:auto;text-align:center;color:var(--muted);padding:25px}
+@media(max-width:600px) {
+ main {grid-template-columns:105px 1fr}
+ aside {padding:7px}
+ aside h3 {font-size:13px}
+ .person {padding:9px 3px;flex-direction:column;text-align:center;gap:5px}
+ .person .details {font-size:11px;max-width:100%;overflow-wrap:anywhere}
+ .person small {font-size:10px}
+ .chathead {padding:12px}
+ .composer {padding:8px;gap:5px}
+ .composer button {padding:10px}
+ #messages {padding:10px}
+}
+</style>
+</head>
+<body>
+<div class="app">
+<header>
+  <div>
+    <div class="brand">Chat<span>Wave</span> ✦</div>
+    <div class="small">Your conversations, connected.</div>
+  </div>
+  <button id="logout" class="secondary hidden">Log out</button>
+</header>
+
+<section id="auth">
+  <h2 id="authTitle">Welcome to ChatWave</h2>
+  <p class="small">Sign in or create your account.</p>
+  <input id="email" type="email" placeholder="Email address" autocomplete="email">
+  <input id="password" type="password" placeholder="Password (6+ characters)" autocomplete="current-password">
+  <input id="displayName" placeholder="Your display name (for sign-up)" maxlength="40">
+  <button class="primary" id="signup">Create account</button>
+  <button class="secondary" id="login">Sign in</button>
+  <p id="authMessage" class="small"></p>
+</section>
+
+<main id="workspace" class="hidden">
+  <aside>
+    <h3>Chats</h3>
+    <input id="search" placeholder="Find a user">
+    <div class="small">Select a user to chat.</div>
+    <div id="people"></div>
+  </aside>
+  <section class="chat">
+    <div class="chathead">
+      <div class="avatar" id="chatAvatar">C</div>
+      <div><strong id="chatName">Choose a user</strong><div class="small" id="chatInfo">ChatWave</div></div>
+    </div>
+    <div id="messages">
+      <div class="empty">👋<h3>Start a conversation</h3>Select a user from the list.</div>
+    </div>
+    <div class="composer">
+      <button class="secondary" id="photoButton" title="Share a photo">＋</button>
+      <input id="photo" type="file" accept="image/*" class="hidden">
+      <input id="messageInput" placeholder="Write a message..." maxlength="3000">
+      <button class="primary" id="send">Send</button>
+    </div>
+    <div id="status">Connect Firebase to start chatting.</div>
+  </section>
+</main>
+</div>
+
+<script type="module">
+import { initializeApp } from
+  "https://www.gstatic.com/firebasejs/12.3.0/firebase-app.js";
+import {
+  getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword,
+  onAuthStateChanged, signOut, updateProfile
+} from "https://www.gstatic.com/firebasejs/12.3.0/firebase-auth.js";
+import {
+  getFirestore, collection, doc, setDoc, getDoc, getDocs,
+  query, where, orderBy, addDoc, onSnapshot, serverTimestamp
+} from "https://www.gstatic.com/firebasejs/12.3.0/firebase-firestore.js";
+import {
+  getStorage, ref, uploadBytes, getDownloadURL
+} from "https://www.gstatic.com/firebasejs/12.3.0/firebase-storage.js";
+
+// STEP: Replace these values with your Firebase project settings.
+const firebaseConfig = {
+  apiKey: "PASTE_YOUR_API_KEY",
+  authDomain: "YOUR_PROJECT.firebaseapp.com",
+  projectId: "YOUR_PROJECT_ID",
+  storageBucket: "YOUR_STORAGE_BUCKET",
+  messagingSenderId: "YOUR_SENDER_ID",
+  appId: "YOUR_APP_ID"
+};
+
+const $ = id => document.getElementById(id);
+let auth, db, storage, me, activeUser;
+let stopPeople, stopMessages;
+const unsub = () => {
+  stopPeople?.(); stopMessages?.();
+  stopPeople = stopMessages = null;
+};
+
+function say(id, text) { $(id).textContent = text; }
+function roomId(a,b) { return [a,b].sort().join("_"); }
+function safeError(e) {
+  return e?.message || "Something went wrong. Please try again.";
+}
+
+const configured = !JSON.stringify(firebaseConfig).includes("PASTE_YOUR")
+  && !JSON.stringify(firebaseConfig).includes("YOUR_PROJECT");
+
+if (!configured) {
+  say("status", "Step needed: add your Firebase project settings in index.html.");
+  say("authMessage", "Create a Firebase project and paste its web config into the code.");
+}
+
+if (configured) {
+  try {
+    const app = initializeApp(firebaseConfig);
+    auth = getAuth(app);
+    db = getFirestore(app);
+    storage = getStorage(app);
+
+    $("signup").onclick = async () => {
+      try {
+        const name = $("displayName").value.trim();
+        if (!name) throw Error("Enter your display name.");
+        const result = await createUserWithEmailAndPassword(
+          auth, $("email").value.trim(), $("password").value
+        );
+        await updateProfile(result.user, {displayName:name});
+        await setDoc(doc(db,"users",result.user.uid), {
+          uid:result.user.uid, name, email:result.user.email,
+          createdAt:serverTimestamp()
+        });
+        say("authMessage","Account created!");
+      } catch(e) { say("authMessage",safeError(e)); }
+    };
+
+    $("login").onclick = async () => {
+      try {
+        await signInWithEmailAndPassword(
+          auth, $("email").value.trim(), $("password").value
+        );
+      } catch(e) { say("authMessage",safeError(e)); }
+    };
+
+    $("logout").onclick = () => signOut(auth);
+
+    onAuthStateChanged(auth, async user => {
+      unsub();
+      me = user;
+      $("auth").classList.toggle("hidden",!!user);
+      $("workspace").classList.toggle("hidden",!user);
+      $("logout").classList.toggle("hidden",!user);
+      if (!user) return;
+      say("status","Signed in as " + (user.displayName || user.email));
+      await setDoc(doc(db,"users",user.uid), {
+        uid:user.uid, name:user.displayName || user.email,
+        email:user.email
+      }, {merge:true});
+      loadPeople();
+    });
+  } catch(e) {
+    say("authMessage","Firebase setup error: " + safeError(e));
+  }
+}
+
+function loadPeople() {
+  stopPeople?.();
+  stopPeople = onSnapshot(collection(db,"users"), snap => {
+    const term = $("search").value.toLowerCase();
+    const users = snap.docs.map(d=>d.data()).filter(u =>
+      u.uid !== me.uid &&
+      ((u.name||"").toLowerCase().includes(term) ||
+       (u.email||"").toLowerCase().includes(term))
+    );
+    $("people").replaceChildren();
+    users.forEach(u => {
+      const item = document.createElement("div");
+      item.className = "person" + (activeUser?.uid===u.uid?" active":"");
+      const avatar = document.createElement("div");
+      avatar.className = "avatar";
+      avatar.textContent = (u.name||"?").charAt(0).toUpperCase();
+      const details = document.createElement("div");
+      details.className = "details";
+      const name = document.createElement("div");
+      name.textContent = u.name || u.email || "User";
+      const email = document.createElement("small");
+      email.textContent = u.email || "";
+      details.append(name,email);
+      item.append(avatar,details);
+      item.onclick = () => openChat(u);
+      $("people").append(item);
+    });
+  }, e=>say("status",safeError(e)));
+}
+$("search").addEventListener("input",loadPeople);
+
+function openChat(user) {
+  activeUser = user;
+  $("chatName").textContent = user.name || user.email;
+  $("chatAvatar").textContent = (user.name||"?")[0].toUpperCase();
+  $("chatInfo").textContent = user.email || "ChatWave user";
+  $("messages").replaceChildren();
+  stopMessages?.();
+  const messages = collection(db,"chats",roomId(me.uid,user.uid),"messages");
+  stopMessages = onSnapshot(query(messages,orderBy("createdAt","asc")),snap=>{
+    $("messages").replaceChildren();
+    snap.forEach(d=>{
+      const m=d.data(), bubble=document.createElement("div");
+      bubble.className="bubble"+(m.senderId===me.uid?" mine":"");
+      if(m.text) {
+        const p=document.createElement("div");
+        p.textContent=m.text;
+        bubble.append(p);
+      }
+      if(m.imageUrl) {
+        const img=document.createElement("img");
+        img.src=m.imageUrl; img.alt="Shared photo"; img.loading="lazy";
+        bubble.append(img);
+      }
+      const time=document.createElement("div");
+      time.className="time";
+      time.textContent=m.createdAt?.toDate
+        ? m.createdAt.toDate().toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"})
+        : "Sending…";
+      bubble.append(time);
+      $("messages").append(bubble);
+    });
+    $("messages").scrollTop=$("messages").scrollHeight;
+  },e=>say("status",safeError(e)));
+  say("status","Messages update in real time.");
+}
+
+async function sendMessage(text,imageUrl=null) {
+  if(!me || !activeUser) throw Error("Choose a user first.");
+  if(!text.trim() && !imageUrl) return;
+  await addDoc(collection(db,"chats",roomId(me.uid,activeUser.uid),"messages"),{
+    senderId:me.uid, text:text.trim(), imageUrl,
+    createdAt:serverTimestamp()
+  });
+}
+
+$("send").onclick = async () => {
+  try {
+    const text=$("messageInput").value;
+    await sendMessage(text);
+    $("messageInput").value="";
+    say("status","Message sent.");
+  } catch(e) { say("status",safeError(e)); }
+};
+$("messageInput").addEventListener("keydown",e=>{
+  if(e.key==="Enter") $("send").click();
+});
+$("photoButton").onclick=()=>$("photo").click();
+$("photo").onchange=async e=>{
+  const file=e.target.files[0];
+  if(!file)return;
+  try {
+    if(!activeUser) throw Error("Choose a user first.");
+    if(!file.type.startsWith("image/")) throw Error("Choose an image.");
+    if(file.size>5*1024*1024) throw Error("Choose an image under 5 MB.");
+    say("status","Uploading photo…");
+    const path=`chatPhotos/${roomId(me.uid,activeUser.uid)}/${me.uid}/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g,"_")}`;
+    const storageRef=ref(storage,path);
+    await uploadBytes(storageRef,file);
+    const url=await getDownloadURL(storageRef);
+    await sendMessage("",url);
+    say("status","Photo shared.");
+  } catch(err) { say("status",safeError(err)); }
+  finally { e.target.value=""; }
+};
+</script>
+</body>
+</html>
